@@ -27,34 +27,64 @@ import {
 } from "@material-tailwind/react";
 import { usePDF } from 'react-to-pdf';
 import { useState, useEffect } from "react";
+import { getDataTransaction } from "@/services/inventory/transaction";
 const TABLE_HEAD = [ "Transaction Date", "Product", "Quantity", "Stock", "Transaction Type", "Supplier/Retailer"];
  
-const TABLE_ROWS = [
-  {
-    transactionDate: "10-09-2023",
-    product: "Ketchup",
-    quantity: "10",
-    stock: "1",
-    transactionType: "Inbound",
-    transactionBy: "Borma"
-  },
-  {
-    transactionDate: "10-09-2023",
-    product: "Ketchup",
-    quantity: "10",
-    stock: "1",
-    transactionType: "Inbound",
-    transactionBy: "Borma"
-  },
-];
+const ITEMS_PER_PAGE = 5 
 
- 
 export function TransactionTable() {
 
   const { toPDF, targetRef } = usePDF({filename: 'Transaction.pdf'});
 
-  const [openFilter, setOpenFilter] = useState(false);
-  const handleOpenFilter = () => setOpenFilter(!openFilter);
+  // GET DATA TRANSACTION
+  const [message, setMessage] = useState('');
+  const [showAlert, setShowAlert] = useState(false); // Untuk kontrol alert
+    
+  const [dataList, setData] = useState([]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(dataList.length / ITEMS_PER_PAGE);
+
+  // SEARCH
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Fungsi untuk menangani perubahan input search
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const filteredData = dataList.filter((transaction) => 
+    transaction.product.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const currentData = filteredData.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  const handleNext = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage((prev) => prev + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentPage > 1) {
+      setCurrentPage((prev) => prev - 1);
+    }
+  };
+  
+  const handleInitialData= () => {
+
+    getDataTransaction()
+    .then(reponse => setData(reponse))
+    .catch(error => console.error("There was an error!", error));
+
+  }
+  useEffect(() => {
+    handleInitialData()
+  }, []);
+
+
 
   return (
     <>
@@ -76,11 +106,10 @@ export function TransactionTable() {
                   <Input
                   label="Search"
                   icon={<MagnifyingGlassIcon className="h-5 w-5" />}
+                  onChange={handleSearchChange}
+                  value={searchQuery} 
                   />
               </div>
-              <Button value="filter" onClick={handleOpenFilter} className="flex items-center gap-3 bg-blue" size="sm">
-                  <FunnelIcon strokeWidth={2} className="h-4 w-4" /> Filter
-              </Button>
             </div>
 
             <Button value="export" onClick={() => toPDF()} className="flex items-center mr-8 gap-3 bg-blue" size="sm">
@@ -109,33 +138,20 @@ export function TransactionTable() {
               </tr>
             </thead>
             <tbody>
-              {TABLE_ROWS.map(
-                (
-                  {
-                    orderDate,
-                    transactionDate,
-                    product,
-                    quantity,
-                    stock,
-                    transactionType,
-                    transactionBy,
-                  },
-                  index,
-                ) => {
-                  const isLast = index === TABLE_ROWS.length - 1;
-                  const classes = isLast
-                    ? "p-4"
-                    : "p-4 border-b border-blue-gray-50";
-  
+            {currentData.length > 0 ? (
+                currentData.map((transaction, index) => {
+                const isLast = index === currentData.length - 1;
+                const classes = isLast ? "p-4" : "p-4 border-b border-blue-gray-50";
+
                   return (
-                    <tr key={orderDate}>
+                    <tr key={transaction.id}>
                       <td className={classes}>
                         <Typography
                           variant="small"
                           color="blue-gray"
                           className="font-normal"
                         >
-                          {transactionDate}
+                          {new Date(transaction.createdAt).toLocaleDateString()}
                         </Typography>
                       </td>
                       <td className={classes}>
@@ -144,7 +160,7 @@ export function TransactionTable() {
                           color="blue-gray"
                           className="font-normal"
                         >
-                          {product}
+                          {transaction.product.name}
                         </Typography>
                       </td>
                       <td className={classes}>
@@ -153,7 +169,7 @@ export function TransactionTable() {
                           color="blue-gray"
                           className="font-normal"
                         >
-                          {quantity}
+                          {transaction.quantity}
                         </Typography>
                       </td>
                       <td className={classes}>
@@ -162,7 +178,7 @@ export function TransactionTable() {
                           color="blue-gray"
                           className="font-normal"
                         >
-                          {stock}
+                          {transaction.stockAfterTransaction}
                         </Typography>
                       </td>
                       <td className={classes}>
@@ -171,7 +187,7 @@ export function TransactionTable() {
                           color="blue-gray"
                           className="font-normal"
                         >
-                          {transactionType}
+                          {transaction.movementType}
                         </Typography>
                       </td>
                       <td className={classes}>
@@ -180,133 +196,55 @@ export function TransactionTable() {
                           color="blue-gray"
                           className="font-normal"
                         >
-                          {transactionBy}
+                          {transaction.movementType === "OUTBOUND" 
+                            ? transaction.retailer?.name || "N/A" 
+                            : transaction.supplier?.name || "N/A"}
                         </Typography>
                       </td>
                     </tr>
                   );
-                },
+                })
+              ) : (
+                <tr>
+                <td colSpan="6" className="p-4 text-center text-blue-gray-500">
+                    <Typography variant="h6" color="blue-gray">
+                        No Data Here
+                    </Typography>
+                    <Typography
+                    variant="small"
+                    color="blue-gray"
+                    className="font-normal leading-none opacity-70 mt-4">
+                        Create your first data
+                    </Typography>
+                </td>
+                </tr>
               )}
             </tbody>
           </table>
         </CardBody>
         <CardFooter className="flex items-center justify-between border-t border-blue-gray-50 p-4">
-          <Button variant="outlined" size="sm">
+        <Button variant="outlined" size="sm" onClick={handlePrevious} disabled={currentPage === 1}>
             Previous
           </Button>
-          <div className="flex items-center gap-2">
-            <IconButton variant="outlined" size="sm">
-              1
-            </IconButton>
-            <IconButton variant="text" size="sm">
-              2
-            </IconButton>
-            <IconButton variant="text" size="sm">
-              3
-            </IconButton>
-            <IconButton variant="text" size="sm">
-              ...
-            </IconButton>
-            <IconButton variant="text" size="sm">
-              8
-            </IconButton>
-            <IconButton variant="text" size="sm">
-              9
-            </IconButton>
-            <IconButton variant="text" size="sm">
-              10
-            </IconButton>
-          </div>
-          <Button variant="outlined" size="sm">
+            <div className="flex items-center gap-2">
+            {Array.from({ length: totalPages }, (_, index) => (
+                <IconButton
+                  key={index}
+                  variant={currentPage === index + 1 ? "outlined" : "text"}
+                  size="sm"
+                  onClick={() => setCurrentPage(index + 1)}
+                >
+                  {index + 1}
+                </IconButton>
+              ))}
+            </div>
+          <Button variant="outlined" size="sm"onClick={handleNext} disabled={currentPage === totalPages}>
             Next
           </Button>
         </CardFooter>
       </Card>
 
-      {/* FILTER */}
-      <Dialog size="xs" open={openFilter} handler={handleOpenFilter} className="p-4">
-        <DialogHeader className="relative m-0 block">
-        </DialogHeader>
-        <DialogBody className="space-y-4 pb-6">
-          <div>
-            <Typography
-              variant="small"
-              color="blue-gray"
-              className="mb-2 text-left font-medium"
-            >
-              Category
-            </Typography>
-    
-            <Select
-              className="!w-full !border-[1.5px] !border-blue-gray-200/90 !border-t-blue-gray-200/90 bg-white text-gray-800 ring-4 ring-transparent placeholder:text-gray-600 focus:!border-primary focus:!border-t-blue-gray-900 group-hover:!border-primary"
-              placeholder="testing123"
-              containerProps={{
-                className: "!min-w-full",
-              }}
-              labelProps={{
-                className: "hidden",
-              }}
-            >
-              <Option>Clothing</Option>
-              <Option>Fashion</Option>
-              <Option>Watches</Option>
-            </Select>
-          </div>
-          <div>
-            <Typography
-              variant="small"
-              color="blue-gray"
-              className="mb-2 text-left font-medium"
-            >
-              Minimum Price
-            </Typography>
-            <Input
-              color="gray"
-              size="lg"
-              placeholder="Input minimum price"
-              name="name"
-              className="placeholder:opacity-100 focus:!border-t-gray-900"
-              containerProps={{
-                className: "!min-w-full",
-              }}
-              labelProps={{
-                className: "hidden",
-              }}
-            />
-          </div>
-          <div>
-            <Typography
-              variant="small"
-              color="blue-gray"
-              className="mb-2 text-left font-medium"
-            >
-              Minimum Price
-            </Typography>
-            <Input
-              color="gray"
-              size="lg"
-              placeholder="Input minimum price"
-              name="name"
-              className="placeholder:opacity-100 focus:!border-t-gray-900"
-              containerProps={{
-                className: "!min-w-full",
-              }}
-              labelProps={{
-                className: "hidden",
-              }}
-            />
-          </div>
-
-        </DialogBody>
-        <DialogFooter className="flex justify-center">
-          <Button variant="outlined" onClick={handleOpenFilter} >
-            Cancel
-          </Button>
-          <Button className="ml-8 " onClick={handleOpenFilter}>
-            Add Delivery
-          </Button>
-        </DialogFooter>
-      </Dialog>
+ 
 
     </>
   );

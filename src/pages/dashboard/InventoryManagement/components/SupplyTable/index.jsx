@@ -161,9 +161,6 @@ export function SupplyTable() {
                   value={searchQuery} 
                   />
               </div>
-              <Button value="filter" onClick={handleOpenFilter} className="flex items-center gap-3 bg-blue" size="sm">
-                  <FunnelIcon strokeWidth={2} className="h-4 w-4" /> Filter
-              </Button>
               <Button value="export" onClick={() => toPDF()} className="flex items-center gap-3 bg-blue" size="sm">
                   <DocumentArrowUpIcon strokeWidth={2} className="h-4 w-4" /> Export
               </Button>
